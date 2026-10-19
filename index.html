@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#121318">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>커스텀 수박게임</title>
+<title>루비게임 1호</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <style>
   :root{
@@ -95,8 +95,7 @@
   .help .close{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;background:var(--panel2);
     border:1px solid var(--line);font-size:16px;display:flex;align-items:center;justify-content:center;}
   .help .close:active{transform:scale(.9);}
-  .help .preview{display:flex;justify-content:center;gap:3px;margin:16px 0 4px;}
-  .help .preview img{width:26px;height:26px;border-radius:50%;}
+  .help .primary{margin-top:18px;}
 
   .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translateX(-50%) translateY(20px);
     background:#2d3142;color:var(--text);padding:10px 16px;border-radius:12px;font-size:13px;opacity:0;pointer-events:none;
@@ -107,8 +106,9 @@
 <body>
 <div id="app">
   <header class="top">
-    <div class="title">🍉 커스텀 수박게임</div>
+    <div class="title">🐶 루비게임 1호</div>
     <div class="tools">
+      <button id="btnSound" class="icon" aria-label="소리 켜기/끄기">🔊</button>
       <button id="btnHelp" class="icon" aria-label="게임 설명">❔</button>
       <button id="btnImages" class="icon" aria-label="이미지 설정">🖼️</button>
       <button id="btnRestart" class="icon" aria-label="다시 시작">↻</button>
@@ -124,10 +124,10 @@
 </div>
 
 <!-- 이미지 설정 화면 -->
-<div id="setup" class="overlay show">
+<div id="setup" class="overlay">
   <div class="sheet">
-    <h1>🍉 커스텀 수박게임</h1>
-    <p class="desc">기본은 우리 강아지 사진 11장이에요. 단계를 눌러 다른 사진을 올리면 자동으로 동그랗게 잘려요. (1단계 → 11단계)</p>
+    <h1>🐶 루비게임 1호</h1>
+    <p class="desc">단계를 눌러 다른 사진을 올리면 자동으로 동그랗게 잘려요. 아직 만나지 못한 단계는 ❓로 가려져 있어요.</p>
     <div id="slots" class="slots"></div>
     <div class="row"><button id="btnClearAll" class="ghost">모든 이미지 기본(강아지)으로 되돌리기</button></div>
     <button id="btnContinue" class="secondary hidden">이어서 하기</button>
@@ -139,7 +139,7 @@
 <div id="help" class="overlay show">
   <div class="card help">
     <button id="btnHelpClose" class="close" aria-label="닫기">✕</button>
-    <h2>🐶 게임 방법</h2>
+    <h2>🐶 루비게임 1호</h2>
     <p class="sub">같은 사진끼리 합쳐서 마지막 단계까지 키워 보세요!</p>
     <ol>
       <li><span class="ic">👆</span><span>상자 위에서 <b>손가락을 좌우로 움직여</b> 떨어뜨릴 위치를 정해요.</span></li>
@@ -148,7 +148,6 @@
       <li><span class="ic">⚠️</span><span>공이 위쪽 <b>점선(데드라인)</b>을 넘은 채로 2초 넘게 있으면 게임 오버예요.</span></li>
       <li><span class="ic">🖼️</span><span>오른쪽 위 버튼으로 <b>사진을 바꾸거나</b>, ❔ 버튼으로 이 설명을 다시 볼 수 있어요.</span></li>
     </ol>
-    <div id="helpChain" class="preview"></div>
     <button id="btnHelpOk" class="primary">알겠어요!</button>
   </div>
 </div>
@@ -183,7 +182,7 @@
   const RADII  = [15, 21, 28, 35, 43, 53, 63, 75, 88, 102, 118];
   const EMOJIS = ['🍒','🍓','🍇','🍊','🍋','🍎','🍐','🍑','🍍','🍈','🍉'];
   const COLORS = ['#ffadad','#ffc6ff','#cdb4db','#ffd6a5','#fdffb6','#ff9aa2','#caffbf','#ffcfd2','#fbe7a1','#b9fbc0','#9be89b'];
-  const SPAWN_WEIGHTS = [30, 26, 20, 14, 10];   // 1~5단계만 랜덤 등장
+  const SPAWN_WEIGHTS = [36, 29, 20, 10, 5];    // 1~5단계만 랜덤 등장 (작은 단계 위주로 살짝 쉽게)
   const SPR = 256;                     // 스프라이트 해상도
   // 기본 이미지: 강아지 얼굴 원형 크롭 (1단계 → 11단계)
   const DEFAULT_IMGS = [
@@ -317,17 +316,35 @@
   }
   function refreshSlot(i){
     const el = slotEls[i];
-    el.querySelector('img').src = sprites[i].toDataURL('image/png');
+    el.querySelector('img').src = isOpen(i) ? sprites[i].toDataURL('image/png') : lockedSrc();
+    el.querySelector('.n').textContent = `${i+1}단계`;
     el.classList.toggle('custom', !!custom[i]);
   }
   function refreshChain(){
     const ch = $('chain'); ch.innerHTML = '';
-    const hc = $('helpChain'); hc.innerHTML = '';
     for (let i = 0; i < 11; i++){
-      const src = sprites[i].toDataURL('image/png');
-      const im = document.createElement('img'); im.src = src; ch.appendChild(im);
-      const hm = document.createElement('img'); hm.src = src; hc.appendChild(hm);
+      const im = document.createElement('img'); im.src = isOpen(i) ? sprites[i].toDataURL('image/png') : lockedSrc(); ch.appendChild(im);
     }
+  }
+
+  // 아직 만나지 못한 단계는 ❓로 가림
+  const LS_SEEN = 'wm_seen';
+  const seen = (() => { try { const a = JSON.parse(store.get(LS_SEEN) || '[]'); return Array.from({ length: 11 }, (_, i) => !!a[i]); } catch(e){ return new Array(11).fill(false); } })();
+  const isOpen = i => seen[i] || !!custom[i];
+  let lockedUrl = null;
+  function lockedSrc(){
+    if (lockedUrl) return lockedUrl;
+    const c = newCanvas(), x = c.getContext('2d'), r = SPR/2;
+    x.fillStyle = '#2f3346'; x.beginPath(); x.arc(r, r, r, 0, Math.PI*2); x.fill();
+    x.lineWidth = SPR*0.045; x.strokeStyle = '#454a63'; x.beginPath(); x.arc(r, r, r - SPR*0.0225, 0, Math.PI*2); x.stroke();
+    x.fillStyle = '#9aa0b4'; x.font = `bold ${SPR*0.5}px -apple-system, sans-serif`;
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', r, r + SPR*0.03);
+    return (lockedUrl = c.toDataURL('image/png'));
+  }
+  function reveal(i){
+    if (seen[i]) return;
+    seen[i] = true; store.set(LS_SEEN, JSON.stringify(seen));
+    if (slotEls[i]){ refreshSlot(i); refreshChain(); }
   }
   function refreshAllUI(){ for (let i = 0; i < 11; i++) refreshSlot(i); refreshChain(); drawNext(); }
 
@@ -357,6 +374,47 @@
     for (let i = 0; i < 11; i++){ custom[i] = null; store.del(LS_IMG + i); sprites[i] = makeDefaultSprite(i); }
     refreshAllUI(); toast('기본 강아지 사진으로 되돌렸어요');
   });
+
+  // ===== 사운드 (Web Audio, 단계별로 다른 소리) =====
+  let actx = null, muted = store.get('wm_mute') === '1', lastSound = 0;
+  // 단계가 커질수록 낮고 풍성한 소리 (펜타토닉 하강)
+  const NOTES = [1318.5, 1174.7, 1046.5, 880, 784, 659.3, 587.3, 523.3, 440, 392, 329.6, 261.6];
+  function unlockAudio(){
+    if (!actx){ try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ return; } }
+    if (actx.state === 'suspended') actx.resume();
+  }
+  ['touchstart', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+  function tone(f0, f1, start, dur, type, vol){
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, start);
+    o.frequency.exponentialRampToValueAtTime(f1, start + dur * 0.6);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(vol, start + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(start); o.stop(start + dur + 0.05);
+  }
+  // lv: 새로 만들어진 단계 (1~10), 11은 마지막 단계끼리 합쳤을 때
+  function playMerge(lv){
+    if (muted || !actx || actx.state !== 'running') return;
+    const now = actx.currentTime;
+    if (now - lastSound < 0.04) return;      // 연쇄 합치기 때 소리가 뭉개지지 않게
+    lastSound = now;
+    const f = NOTES[Math.min(lv, 11)];
+    const vol = 0.12 + Math.min(lv, 10) * 0.008;
+    tone(f * 1.6, f, now, 0.12, 'sine', vol);                       // 뽁
+    const chord = lv < 4 ? [1] : lv < 7 ? [1, 1.5] : lv < 10 ? [1, 1.25, 1.5] : [1, 1.25, 1.5, 2];
+    chord.forEach((m, k) => tone(f * m, f * m, now + 0.04 + k * 0.06, 0.22 + lv * 0.04, lv % 2 ? 'triangle' : 'sine', vol * 0.7));
+    if (lv >= 10) [1, 1.25, 1.5, 2].forEach((m, k) => tone(523.3 * m, 523.3 * m, now + 0.35 + k * 0.1, 0.4, 'triangle', 0.1));
+  }
+  const soundBtn = $('btnSound');
+  const syncSoundBtn = () => { soundBtn.textContent = muted ? '🔇' : '🔊'; };
+  soundBtn.addEventListener('click', () => {
+    muted = !muted; store.set('wm_mute', muted ? '1' : '0'); syncSoundBtn();
+    if (!muted){ unlockAudio(); playMerge(3); }
+  });
+  syncSoundBtn();
 
   // ===== 게임 상태 =====
   let engine, state = 'setup';   // setup | play | paused | over
@@ -416,12 +474,14 @@
       let gain = (lv + 1) * (lv + 2) / 2;
       if (lv < 10){
         const n = createFruit(x, y, lv + 1);
+        reveal(lv + 1);
         n.pop = 0.45;
         Body.setVelocity(n, { x: (a.velocity.x + b.velocity.x)/2, y: Math.min(0, (a.velocity.y + b.velocity.y)/2) });
       } else {
         gain += 100;   // 수박 + 수박 보너스
       }
       addScore(gain);
+      playMerge(lv + 1);
       burst(x, y, lv, RADII[lv]);
       floaters.push({ x, y: y - RADII[lv], text: '+' + gain, life: 1 });
       try { navigator.vibrate && navigator.vibrate(12); } catch(e){}
@@ -448,6 +508,7 @@
     score = 0; scoreEl.textContent = 0;
     mergeQueue = []; particles = []; floaters = [];
     current = randLevel(); next = randLevel();
+    reveal(current); reveal(next);
     dropX = W/2; canDrop = true; warnLevel = 0;
     startBest = best;
     drawNext();
@@ -462,6 +523,7 @@
     const b = createFruit(x, DROP_Y, current);
     Body.setAngle(b, (Math.random() - 0.5) * 0.4);
     current = next; next = randLevel();
+    reveal(next);
     drawNext();
     canDrop = false;
     setTimeout(() => { canDrop = true; }, DROP_COOLDOWN);
@@ -539,12 +601,16 @@
   $('btnReimg').addEventListener('click', () => { overEl.classList.remove('show'); openSetup(false); });
 
   const helpEl = $('help');
-  const closeHelp = () => helpEl.classList.remove('show');
+  const closeHelp = () => {
+    helpEl.classList.remove('show');
+    if (!engine) startGame();
+    else if (state === 'paused' && !setupEl.classList.contains('show')) state = 'play';
+  };
   $('btnHelpClose').addEventListener('click', closeHelp);
   $('btnHelpOk').addEventListener('click', closeHelp);
   helpEl.addEventListener('click', e => { if (e.target === helpEl) closeHelp(); });
   $('btnHelp').addEventListener('click', () => {
-    if (state === 'play') openSetup(true);
+    if (state === 'play') state = 'paused';
     helpEl.classList.add('show');
   });
 
